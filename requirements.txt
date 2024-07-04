@@ -3,6 +3,5 @@ streamlit
 google-generativeai
 python-dotenv
 pathlib
-dotenv
 assemblyai
 moviepy
