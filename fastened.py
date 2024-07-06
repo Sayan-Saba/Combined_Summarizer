@@ -1,13 +1,12 @@
 import streamlit as st
 import os
 import io
-import asyncio
-from moviepy.editor import VideoFileClip
+import moviepy.editor as mp
 import assemblyai as aai
 import google.generativeai as genai
 from dotenv import load_dotenv
 from youtube_transcript_api import YouTubeTranscriptApi
-from concurrent.futures import ThreadPoolExecutor
+import time
 
 # Load environment variables
 load_dotenv()
@@ -41,7 +40,7 @@ def extract_audio_from_video(uploaded_file):
 
     try:
         # Convert video to audio
-        video = VideoFileClip(temp_video_path)
+        video = mp.VideoFileClip(temp_video_path)
         video.audio.write_audiofile(audio_file_path)
     finally:
         # Ensure the temporary video file is deleted
@@ -51,10 +50,14 @@ def extract_audio_from_video(uploaded_file):
     return audio_file_path
 
 # Transcribe audio using AssemblyAI
-async def transcribe_audio_assemblyai(audio_path):
-    transcriber = aai.Transcriber()
-    transcript = await transcriber.transcribe(audio_path)
-    return transcript.text
+def transcribe_audio_assemblyai(audio_path):
+    try:
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(audio_path)
+        return transcript.text
+    except Exception as e:
+        st.error(f"Error transcribing audio: {e}")
+        return None
 
 # Generate summary using Google Gemini Pro
 def generate_summary(transcript_text, prompt):
@@ -66,11 +69,14 @@ def generate_summary(transcript_text, prompt):
         st.error(f"Error generating summary: {e}")
         return None
 
-async def process_uploaded_video(uploaded_file):
+# Process uploaded video
+def process_uploaded_video(uploaded_file):
     audio_path = extract_audio_from_video(uploaded_file)
-    transcript_text = await transcribe_audio_assemblyai(audio_path)
-    summary = generate_summary(transcript_text, prompt)
-    return summary
+    transcript_text = transcribe_audio_assemblyai(audio_path)
+    if transcript_text:
+        summary = generate_summary(transcript_text, prompt)
+        return summary
+    return None
 
 # Streamlit UI
 st.title("Video Summarizer")
@@ -103,8 +109,7 @@ elif option == "Upload a Video":
 
         if st.button("Get Summary"):
             st.write("Processing video and generating summary, please wait...")
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            summary = loop.run_until_complete(process_uploaded_video(uploaded_file))
-            st.markdown("## Summary:")
-            st.write(summary)
+            summary = process_uploaded_video(uploaded_file)
+            if summary:
+                st.markdown("## Summary:")
+                st.write(summary)
